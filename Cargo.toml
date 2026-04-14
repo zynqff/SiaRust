@@ -1,0 +1,43 @@
+[package]
+name = "guardlib"
+version = "1.0.0"
+edition = "2021"
+description = "Cryptographic config verification and certificate pinning — FFI library"
+authors = ["GuardLib"]
+license = "Proprietary"
+
+[lib]
+name = "guardlib"
+crate-type = ["cdylib", "staticlib"]
+# cdylib   → .so (Android), .dylib (macOS/iOS), .dll (Windows)
+# staticlib → .a (iOS static, server static linking)
+
+[dependencies]
+ed25519-dalek = { version = "2", default-features = false, features = ["alloc"] }
+sha2 = { version = "0.10", default-features = false }
+
+[profile.release]
+# Abort on panic — makes Scenario 5 behavior deterministic (SIGABRT, not stack unwind)
+panic = "abort"
+# Aggressive optimization — harder to reverse
+opt-level = 3
+lto = true          # Link-time optimization — inlines and eliminates dead code
+codegen-units = 1   # Single codegen unit — better optimization, less predictable layout
+strip = true        # Strip symbols from release binary
+overflow-checks = false
+
+[profile.dev]
+panic = "unwind"    # Keep unwinding in dev for better error messages
+
+# ── Example utilities ─────────────────────────────────────────────────────────
+[[example]]
+name = "keygen"
+path = "examples/keygen.rs"
+
+[[example]]
+name = "sign_config"
+path = "examples/sign_config.rs"
+
+[[example]]
+name = "verify_test"
+path = "examples/verify_test.rs"
