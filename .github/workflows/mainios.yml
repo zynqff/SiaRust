@@ -34,7 +34,7 @@ jobs:
           cargo build --release --target aarch64-apple-ios-sim
           cargo build --release --target x86_64-apple-ios
 
-      - name: Create XCFramework
+      - name: Create fat simulator library
         run: |
           mkdir -p dist/ios
           lipo -create \
@@ -42,10 +42,15 @@ jobs:
             target/x86_64-apple-ios/release/libguardlib.a \
             -output dist/ios/libguardlib-simulator.a
           cp target/aarch64-apple-ios/release/libguardlib.a dist/ios/libguardlib-device.a
+
+      - name: Create XCFramework
+        run: |
+          rm -rf GuardLib.xcframework
           xcodebuild -create-xcframework \
             -library dist/ios/libguardlib-device.a -headers . \
             -library dist/ios/libguardlib-simulator.a -headers . \
-            -output dist/ios/GuardLib.xcframework
+            -output GuardLib.xcframework
+          mv GuardLib.xcframework dist/ios/
 
       - name: Copy headers
         run: cp guardlib.h dist/ios/
