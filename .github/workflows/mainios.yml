@@ -34,26 +34,31 @@ jobs:
           cargo build --release --target aarch64-apple-ios-sim
           cargo build --release --target x86_64-apple-ios
 
-      - name: Create fat simulator library
+      - name: Prepare clean workspace
         run: |
-          mkdir -p dist/ios
+          mkdir -p xcframework_work/device
+          mkdir -p xcframework_work/simulator
+          mkdir -p xcframework_work/headers
+          cp guardlib.h xcframework_work/headers/
+          cp target/aarch64-apple-ios/release/libguardlib.a xcframework_work/device/
           lipo -create \
             target/aarch64-apple-ios-sim/release/libguardlib.a \
             target/x86_64-apple-ios/release/libguardlib.a \
-            -output dist/ios/libguardlib-simulator.a
-          cp target/aarch64-apple-ios/release/libguardlib.a dist/ios/libguardlib-device.a
+            -output xcframework_work/simulator/libguardlib.a
 
       - name: Create XCFramework
         run: |
-          rm -rf GuardLib.xcframework
+          cd xcframework_work
           xcodebuild -create-xcframework \
-            -library dist/ios/libguardlib-device.a -headers . \
-            -library dist/ios/libguardlib-simulator.a -headers . \
+            -library device/libguardlib.a -headers headers \
+            -library simulator/libguardlib.a -headers headers \
             -output GuardLib.xcframework
-          mv GuardLib.xcframework dist/ios/
 
-      - name: Copy headers
-        run: cp guardlib.h dist/ios/
+      - name: Copy result to dist
+        run: |
+          mkdir -p dist/ios
+          mv xcframework_work/GuardLib.xcframework dist/ios/
+          cp guardlib.h dist/ios/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
