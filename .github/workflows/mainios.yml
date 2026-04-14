@@ -1,0 +1,57 @@
+name: Build GuardLib for iOS
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Install iOS targets
+        run: |
+          rustup target add aarch64-apple-ios
+          rustup target add aarch64-apple-ios-sim
+          rustup target add x86_64-apple-ios
+
+      - name: Build iOS device library
+        run: cargo build --release --target aarch64-apple-ios
+
+      - name: Build iOS simulator libraries
+        run: |
+          cargo build --release --target aarch64-apple-ios-sim
+          cargo build --release --target x86_64-apple-ios
+
+      - name: Create XCFramework
+        run: |
+          mkdir -p dist/ios
+          lipo -create \
+            target/aarch64-apple-ios-sim/release/libguardlib.a \
+            target/x86_64-apple-ios/release/libguardlib.a \
+            -output dist/ios/libguardlib-simulator.a
+          cp target/aarch64-apple-ios/release/libguardlib.a dist/ios/libguardlib-device.a
+          xcodebuild -create-xcframework \
+            -library dist/ios/libguardlib-device.a -headers . \
+            -library dist/ios/libguardlib-simulator.a -headers . \
+            -output dist/ios/GuardLib.xcframework
+
+      - name: Copy headers
+        run: cp guardlib.h dist/ios/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: guardlib-ios
+          path: dist/ios/
