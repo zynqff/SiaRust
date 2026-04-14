@@ -1,0 +1,84 @@
+name: Build GuardLib for Android, Linux, Windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-cross:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          target: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android, i686-linux-android
+
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+          add-to-path: false
+        id: setup-ndk
+
+      - name: Configure Android linkers
+        run: |
+          mkdir -p .cargo
+          cat > .cargo/config.toml << EOF
+          [target.aarch64-linux-android]
+          linker = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
+          [target.armv7-linux-androideabi]
+          linker = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang"
+          [target.x86_64-linux-android]
+          linker = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang"
+          [target.i686-linux-android]
+          linker = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android21-clang"
+          EOF
+
+      - name: Install Linux target
+        run: rustup target add x86_64-unknown-linux-gnu
+
+      - name: Install Windows target
+        run: rustup target add x86_64-pc-windows-gnu
+
+      - name: Install cargo-binutils
+        run: cargo install cargo-binutils
+
+      - name: Build Android libraries
+        run: |
+          for target in aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android; do
+            cargo build --release --target $target
+          done
+          mkdir -p dist/android/jniLibs
+          cp target/aarch64-linux-android/release/libguardlib.so dist/android/jniLibs/arm64-v8a/
+          cp target/armv7-linux-androideabi/release/libguardlib.so dist/android/jniLibs/armeabi-v7a/
+          cp target/x86_64-linux-android/release/libguardlib.so dist/android/jniLibs/x86_64/
+          cp target/i686-linux-android/release/libguardlib.so dist/android/jniLibs/x86/
+
+      - name: Build Linux library
+        run: |
+          cargo build --release --target x86_64-unknown-linux-gnu
+          mkdir -p dist/linux
+          cp target/x86_64-unknown-linux-gnu/release/libguardlib.so dist/linux/
+
+      - name: Build Windows library
+        run: |
+          cargo build --release --target x86_64-pc-windows-gnu
+          mkdir -p dist/windows
+          cp target/x86_64-pc-windows-gnu/release/guardlib.dll dist/windows/
+
+      - name: Copy headers
+        run: cp guardlib.h dist/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: guardlib-cross-platform
+          path: dist/
