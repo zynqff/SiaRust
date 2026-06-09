@@ -247,5 +247,4 @@ guardlib/
 
 ## License
 
-Proprietary. Provided to the licensee for use in their applications.
-Redistribution, resale, or open-source publication is prohibited.
+Open Source
